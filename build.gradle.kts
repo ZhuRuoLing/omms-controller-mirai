@@ -13,3 +13,7 @@ repositories {
     maven("https://maven.aliyun.com/repository/public") // 阿里云国内代理仓库
     mavenCentral()
 }
+
+dependencies{
+    implementation("com.google.code.gson:gson:2.9.1")
+}
