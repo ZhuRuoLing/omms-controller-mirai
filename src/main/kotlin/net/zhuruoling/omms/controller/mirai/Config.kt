@@ -11,7 +11,6 @@ object Config {
     var botId: Long = 0L
     var groups = mutableListOf<Long>()
     var channel = ""
-    private var configPath = ""
 
     private val defaultProperties: Properties
 
@@ -26,7 +25,6 @@ object Config {
     @JvmStatic
     fun createConfig(configFolder: File){
         val config = configFolder.absolutePath + "\\config.properties"
-        configPath = config
         Files.createFile(Path(config))
         Files.write(
             Path(config), """
@@ -37,7 +35,7 @@ object Config {
     }
 
     @JvmStatic
-    fun readConfig(){
+    fun readConfig(configPath:String){
         if (!Files.exists(Path(configPath))){
             throw FileNotFoundException(configPath)
         }
