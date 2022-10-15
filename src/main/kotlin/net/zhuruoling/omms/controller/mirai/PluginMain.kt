@@ -1,25 +1,28 @@
 package net.zhuruoling.omms.controller.mirai
 
 import com.google.gson.Gson
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import io.ktor.client.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.auth.*
+import io.ktor.client.plugins.auth.providers.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import kotlinx.coroutines.*
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescription
 import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
 import net.mamoe.mirai.contact.nameCardOrNick
-import net.mamoe.mirai.event.GlobalEventChannel
 import net.mamoe.mirai.event.events.BotOfflineEvent
 import net.mamoe.mirai.event.events.BotOnlineEvent
-import net.mamoe.mirai.event.events.FriendMessageEvent
 import net.mamoe.mirai.event.events.GroupMessageEvent
 import net.mamoe.mirai.event.globalEventChannel
 import net.mamoe.mirai.message.data.content
 import net.mamoe.mirai.message.data.isContentEmpty
 import net.mamoe.mirai.utils.info
+import net.zhuruoling.omms.controller.mirai.network.broadcast.Broadcast
 import net.zhuruoling.omms.controller.mirai.network.broadcast.UdpBroadcastSender
 import net.zhuruoling.omms.controller.mirai.network.broadcast.UdpReceiver
-import net.zhuruoling.omms.controller.mirai.network.broadcast.Broadcast
 import net.zhuruoling.omms.controller.mirai.util.TARGET_CHAT
+import net.zhuruoling.omms.controller.mirai.util.calculateToken
 import net.zhuruoling.omms.controller.mirai.util.rpWithComment
 import java.io.File
 import java.text.SimpleDateFormat
@@ -37,6 +40,17 @@ object PluginMain : KotlinPlugin(
     private val udpBroadcastSender = UdpBroadcastSender()
     private lateinit var udpReceiver: UdpReceiver
 
+    val client = HttpClient(CIO){
+        install(Auth){
+            basic {
+                credentials {
+                    BasicAuthCredentials(Config.name, calculateToken(Config.name))
+                }
+                realm = "omms simple auth"
+            }
+        }
+    }
+
     @OptIn(DelicateCoroutinesApi::class)
     override fun onEnable() {
         val config = configFolder.absolutePath + "\\config.properties"
@@ -47,6 +61,7 @@ object PluginMain : KotlinPlugin(
             Config.readConfig(config)
         }
         logger.info { "Registering events." }
+
         //配置文件目录 "${dataFolder.absolutePath}/"
         val eventChannel = globalEventChannel(this.coroutineContext)
         eventChannel.subscribeAlways<BotOnlineEvent> {
@@ -92,23 +107,49 @@ object PluginMain : KotlinPlugin(
                     """
                     .mc <消息内容>  :将消息广播到mc服务器
                     .jrrp :今日人品
+                    .exec :执行OMMS Central Server控制台指令
                 """.trimIndent()
                 )
-            }
-            if (this.message.contentToString().startsWith(".mc ") || this.message.contentToString().startsWith("。mc")) {
-                if (TARGET_CHAT != null) {
-                    udpBroadcastSender.addToQueue(
-                        TARGET_CHAT,
-                        Broadcast(
-                            Config.channel,
-                            "QQ",
-                            this.sender.nameCardOrNick,
-                            this.message.contentToString().removePrefix(".mc ").removePrefix("。mc ")
-                        ).asJsonString()
-                    )
-                }
                 return@subscribeAlways
             }
+
+            if (this.message.contentToString().startsWith(".exec ") && this.sender.id in Config.ops) {
+                val command = this.message.contentToString().removePrefix(".exec ")
+                GlobalScope.launch(Dispatchers.IO) {
+                    try{
+                        val response = client.post("http://${Config.httpAddress}/command/run") {
+                            headers.append(HttpHeaders.UserAgent, "omms controller")
+                            setBody(command)
+                        }
+                        this@subscribeAlways.group.sendMessage(
+                            when (response.status) {
+                                HttpStatusCode.OK -> "Successfully submitted command $command to server, code ${response.status}"
+                                HttpStatusCode.Unauthorized -> "Failed to authenticate using name ${Config.name} with server."
+                                HttpStatusCode.NotFound -> "Cannot submit command to server, that might caused by a outdated Central server."
+                                else -> "Cannot submit command to server, code: ${response.status}"
+                            }
+                        )
+                    }
+                    catch (e: Throwable){
+                        this@subscribeAlways.group.sendMessage("Cannot submit command to server, reason ${e.message}")
+                        e.printStackTrace()
+                    }
+                }
+            }
+
+            if (this.message.contentToString().startsWith(".mc ") || this.message.contentToString().startsWith("。mc")) {
+                udpBroadcastSender.addToQueue(
+                    TARGET_CHAT,
+                    Broadcast(
+                        Config.channel,
+                        "QQ",
+                        this.sender.nameCardOrNick,
+                        this.message.contentToString().removePrefix(".mc ").removePrefix("。mc ")
+                    ).asJsonString()
+                )
+                return@subscribeAlways
+            }
+
 
             it.message.forEach { singleMessage ->
                 if (!singleMessage.isContentEmpty()) {
@@ -117,7 +158,7 @@ object PluginMain : KotlinPlugin(
                             it.sender.id xor SimpleDateFormat("YYYYMMDD").format(Date()).hashCode().toLong()
                         ).nextInt(IntRange(0, 100))
                         this.group.sendMessage(rpWithComment(rp))
-                        return@forEach
+                        return@subscribeAlways
                     }
                 }
             }
@@ -131,7 +172,6 @@ object PluginMain : KotlinPlugin(
         super.onDisable()
         udpBroadcastSender.isStopped = true
     }
-
 
 
 }

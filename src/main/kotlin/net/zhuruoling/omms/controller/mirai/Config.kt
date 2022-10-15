@@ -11,7 +11,9 @@ object Config {
     var botId: Long = 0L
     var groups = mutableListOf<Long>()
     var channel = ""
-
+    var ops = mutableListOf<Long>()
+    var name = "omms-controller-mirai"
+    var httpAddress = ""
     private val defaultProperties: Properties
 
     init {
@@ -19,11 +21,12 @@ object Config {
         properties.setProperty("botId", "123456")
         properties.setProperty("groups", "12345678")
         properties.setProperty("channel", "GLOBAL")
+        properties.setProperty("name", "omms-controller-mirai")
         defaultProperties = properties
     }
 
     @JvmStatic
-    fun createConfig(configFolder: File){
+    fun createConfig(configFolder: File) {
         val config = configFolder.absolutePath + "\\config.properties"
         Files.createFile(Path(config))
         Files.write(
@@ -31,12 +34,17 @@ object Config {
                 botId=123456
                 groups=12345678
                 channel=GLOBAL
-            """.trimIndent().encodeToByteArray())
+                ops=12345678
+                name=omms-controller-mirai
+                http_query_ip=localhost
+                http_query_port=50001
+            """.trimIndent().encodeToByteArray()
+        )
     }
 
-    @JvmStatic
-    fun readConfig(configPath:String){
-        if (!Files.exists(Path(configPath))){
+    @JvmStatic//opString
+    fun readConfig(configPath: String) {
+        if (!Files.exists(Path(configPath))) {
             throw FileNotFoundException(configPath)
         }
         val properties: Properties = defaultProperties
@@ -44,14 +52,26 @@ object Config {
         this.botId = properties.getProperty("botId").toLong()
         this.channel = properties.getProperty("channel")
         val groupString = properties.getProperty("groups")
-        if ("," in groupString){
+        val opString = properties.getProperty("ops")
+        name = properties.getProperty("name")
+        httpAddress = properties.getProperty("http_query_ip") + ":" + properties.getProperty("http_query_port")
+        if ("," in groupString) {
             val groups = groupString.split(",").toMutableList()
             groups.forEach {
                 this.groups.add(it.toLong())
             }
-        }
-        else{
+        } else {
             this.groups.add(groupString.toLong())
+        }
+
+
+        if ("," in opString) {
+            val ops = opString.split(",").toMutableList()
+            ops.forEach {
+                this.ops.add(it.toLong())
+            }
+        } else {
+            this.ops.add(opString.toLong())
         }
     }
 }
