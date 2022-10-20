@@ -14,7 +14,7 @@ val TARGET_CHAT: Target = UdpBroadcastSender.createTarget("224.114.51.4", 10086)
 val TARGET_CONTROL: Target = UdpBroadcastSender.createTarget("224.114.51.4", 10087)
 
 enum class RPType {
-    NICE, FUCK, NORMAL, NULL
+    NICE, FUCK, NORMAL, NULL, ONE_HUNDRED
 }
 
 fun rpWithComment(rp: Int): String {
@@ -23,6 +23,7 @@ fun rpWithComment(rp: Int): String {
         RPType.FUCK -> message.plus(" 呜哇...")
         RPType.NORMAL -> message.plus(" 还行啦...")
         RPType.NICE -> message.plus(" 芜湖！")
+        RPType.ONE_HUNDRED -> "你今日的人品是：100！！！！！！！100！！！！！！！100！！！！！！"
         else -> message
     }
 }
@@ -34,8 +35,11 @@ fun rpType(rp: Int): RPType {
     if (rp in 31..60) {
         return RPType.NORMAL
     }
-    if (rp in 61..100) {
+    if (rp in 61 until 100) {
         return RPType.NICE
+    }
+    if(rp == 100){
+        return RPType.ONE_HUNDRED
     }
     return RPType.NULL
 }
