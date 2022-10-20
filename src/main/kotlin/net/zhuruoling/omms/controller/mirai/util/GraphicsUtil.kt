@@ -91,45 +91,6 @@ fun genImage(systemInfo : SystemInfo): InputStream? {
             })"
         )
     }
-    strings.add("Network:")
-    info.networkInfo.apply {
-        strings.add("  Hostname: ${this.hostName}")
-        strings.add("  Domain name: ${this.domainName}")
-
-        strings.add("  ipv4 Gateway:${this.ipv4DefaultGateway}")
-        strings.add("  ipv6 Gateway:${this.ipv6DefaultGateway}")
-        strings.add("  DNS Servers:")
-        dnsServers.forEach {
-            strings.add("    $it")
-        }
-        strings.add("  Network IFs:")
-        networkInterfaceList.forEach {
-            if (it.speed / 1024 / 1024 < 10
-                || it.displayName.contains("VMware")
-                || it.displayName.contains("Hyper-V")
-                || it.displayName.contains("Virtual")
-            ) {
-                if (it.displayName.contains("PCIe")
-                    || it.displayName.toLowerCasePreservingASCIIRules().contains("wi")
-                    || it.displayName.toLowerCasePreservingASCIIRules().contains("fi")
-                ) else {
-                    return@forEach
-                }
-            }
-            strings.add("    ${it.displayName}")
-            strings.add("      speed: ${it.speed / 1024 / 1024}Mbps")
-            strings.add("      MAC addr: ${it.macAddress}")
-            strings.add("      mtu: ${it.mtu}")
-            strings.add("      ipv4 addr:")
-            it.ipv4Address.forEach { addr ->
-                strings.add("        $addr")
-            }
-            strings.add("      ipv6 addr:")
-            it.ipv6Address.forEach { addr ->
-                strings.add("        $addr")
-            }
-        }
-    }
     val font = Font("Consolas", Font.PLAIN, 32)
     val image = createImage(
         1080,
