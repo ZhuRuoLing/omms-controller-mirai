@@ -1,7 +1,9 @@
 package net.zhuruoling.omms.controller.mirai
 
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.auth.*
 import io.ktor.client.plugins.auth.providers.*
@@ -10,21 +12,26 @@ import io.ktor.http.*
 import kotlinx.coroutines.*
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescription
 import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
+import net.mamoe.mirai.contact.Contact.Companion.sendImage
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.events.BotOfflineEvent
 import net.mamoe.mirai.event.events.BotOnlineEvent
 import net.mamoe.mirai.event.events.GroupMessageEvent
 import net.mamoe.mirai.event.globalEventChannel
+import net.mamoe.mirai.message.data.Message
 import net.mamoe.mirai.message.data.content
 import net.mamoe.mirai.message.data.isContentEmpty
 import net.mamoe.mirai.utils.info
 import net.zhuruoling.omms.controller.mirai.network.broadcast.Broadcast
 import net.zhuruoling.omms.controller.mirai.network.broadcast.UdpBroadcastSender
 import net.zhuruoling.omms.controller.mirai.network.broadcast.UdpReceiver
+import net.zhuruoling.omms.controller.mirai.system.SystemInfo
 import net.zhuruoling.omms.controller.mirai.util.TARGET_CHAT
 import net.zhuruoling.omms.controller.mirai.util.calculateToken
+import net.zhuruoling.omms.controller.mirai.util.genImage
 import net.zhuruoling.omms.controller.mirai.util.rpWithComment
 import java.io.File
+import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.random.Random
@@ -39,9 +46,10 @@ object PluginMain : KotlinPlugin(
 
     private val udpBroadcastSender = UdpBroadcastSender()
     private lateinit var udpReceiver: UdpReceiver
+    private val gson = GsonBuilder().serializeNulls().create()
 
-    val client = HttpClient(CIO){
-        install(Auth){
+    private val client = HttpClient(CIO) {
+        install(Auth) {
             basic {
                 credentials {
                     BasicAuthCredentials(Config.name, calculateToken(Config.name))
@@ -50,6 +58,7 @@ object PluginMain : KotlinPlugin(
             }
         }
     }
+
 
     @OptIn(DelicateCoroutinesApi::class)
     override fun onEnable() {
@@ -116,7 +125,7 @@ object PluginMain : KotlinPlugin(
             if (this.message.contentToString().startsWith(".exec ") && this.sender.id in Config.ops) {
                 val command = this.message.contentToString().removePrefix(".exec ")
                 GlobalScope.launch(Dispatchers.IO) {
-                    try{
+                    try {
                         val response = client.post("http://${Config.httpAddress}/command/run") {
                             headers.append(HttpHeaders.UserAgent, "omms controller")
                             setBody(command)
@@ -129,12 +138,34 @@ object PluginMain : KotlinPlugin(
                                 else -> "Cannot submit command to server, code: ${response.status}"
                             }
                         )
-                    }
-                    catch (e: Throwable){
+                    } catch (e: Throwable) {
                         this@subscribeAlways.group.sendMessage("Cannot submit command to server, reason ${e.message}")
                         e.printStackTrace()
                     }
                 }
+                return@subscribeAlways
+            }
+
+            if (this.message.contentToString() == ".status") {
+                val response = client.get("http://${Config.httpAddress}/status") {
+                    headers.append(HttpHeaders.UserAgent, "omms controller")
+                }
+                try {
+                    when (response.status) {
+                        HttpStatusCode.OK -> genImage(
+                            gson.fromJson(
+                                response.body<String>(),
+                                SystemInfo::class.java
+                            )
+                        )?.let { it1 -> this.group.sendImage(it1) }
+                        HttpStatusCode.Unauthorized -> this.group.sendMessage("Failed to authenticate using name ${Config.name} with server.")
+                        HttpStatusCode.NotFound -> this.group.sendMessage("Cannot fetch system info from server, that might caused by a outdated Central server.")
+                        else -> this.group.sendMessage("Cannot contact with server, code: ${response.status}")
+                    }
+                } catch (ignored: Exception) {
+
+                }
+                return@subscribeAlways
             }
 
             if (this.message.contentToString().startsWith(".mc ") || this.message.contentToString().startsWith("。mc")) {

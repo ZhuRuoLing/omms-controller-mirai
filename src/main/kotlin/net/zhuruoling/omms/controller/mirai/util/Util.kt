@@ -2,11 +2,13 @@ package net.zhuruoling.omms.controller.mirai.util
 
 import net.zhuruoling.omms.controller.mirai.network.Target
 import net.zhuruoling.omms.controller.mirai.network.broadcast.UdpBroadcastSender
+import java.io.File
 import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
+import kotlin.streams.toList
 
 val TARGET_CHAT: Target = UdpBroadcastSender.createTarget("224.114.51.4", 10086)
 val TARGET_CONTROL: Target = UdpBroadcastSender.createTarget("224.114.51.4", 10087)
@@ -64,4 +66,31 @@ fun calculateToken(password: Int, i: Int, j: Int, k: Int): Int {
     token += j - k
     token = password xor token
     return token
+}
+
+fun getWorkingDir(): String? {
+    val directory = File("")
+    return directory.absolutePath
+}
+
+fun randomStringGen(len: Int): String {
+    val ch = "abcdefghijklmnopqrstuvwxyzABCDEFGHIGKLMNOPQRSTUVWXYZ0123456789"
+    val stringBuffer = StringBuilder()
+    for (i in 0 until len) {
+        val random = Random(System.nanoTime())
+        val num = random.nextInt(62)
+        stringBuffer.append(ch[num])
+    }
+    return stringBuffer.toString()
+}
+
+fun joinFilePaths(vararg pathComponent: String?): String {
+    val paths: Array<out String?> = pathComponent
+    val path = java.lang.StringBuilder()
+    path.append(getWorkingDir())
+    Arrays.stream(paths).toList().forEach { x ->
+        path.append(File.separator)
+        path.append(x)
+    }
+    return path.toString()
 }

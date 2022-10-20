@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "net.zhuruoling"
-version = "0.6.8"
+version = "0.6.10"
 
 repositories {
     maven("https://maven.aliyun.com/repository/public") // 阿里云国内代理仓库
@@ -20,5 +20,6 @@ dependencies{
     implementation("io.ktor:ktor-client-cio:2.1.2")
     implementation("io.ktor:ktor-client-auth:2.1.2")
     implementation("io.ktor:ktor-client-auth-jvm:2.1.2")
+    implementation("com.github.oshi:oshi-core:6.1.6")
 
 }
