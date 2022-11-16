@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "net.zhuruoling"
-version = "0.6.10"
+version = "0.7.1"
 
 repositories {
     maven("https://maven.aliyun.com/repository/public") // 阿里云国内代理仓库

@@ -4,7 +4,7 @@ import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileReader
 import java.nio.file.Files
-import java.util.Properties
+import java.util.*
 import kotlin.io.path.Path
 
 object Config {
@@ -14,6 +14,9 @@ object Config {
     var ops = mutableListOf<Long>()
     var name = "omms-controller-mirai"
     var httpAddress = ""
+    var jrrpCheats = false
+    var jrrpPersons = mutableListOf<Long>()
+    var jrrpRangeMap = mutableMapOf<Long, IntRange>()
     private val defaultProperties: Properties
 
     init {
@@ -38,6 +41,9 @@ object Config {
                 name=omms-controller-mirai
                 http_query_ip=localhost
                 http_query_port=50001
+                jrrp_cheat=false
+                jrrp_persons=123456
+                jrrp.123456.range=1..100
             """.trimIndent().encodeToByteArray()
         )
     }
@@ -55,6 +61,17 @@ object Config {
         val opString = properties.getProperty("ops")
         name = properties.getProperty("name")
         httpAddress = properties.getProperty("http_query_ip") + ":" + properties.getProperty("http_query_port")
+        jrrpCheats = properties.getProperty("jrrp_cheat").toBoolean()
+        val jrrpPersonString = properties.getProperty("jrrp_persons")
+        if (jrrpPersonString.contains(",")) {
+            jrrpPersonString.split(",").forEach{
+                val rangeString = properties.getProperty("jrrp.$it.range")
+                jrrpRangeMap[it.toLong()] = IntRange(rangeString.split("..")[0].toInt(), rangeString.split("..")[1].toInt())
+            }
+        } else {
+            val rangeString = properties.getProperty("jrrp.$jrrpPersonString.range")
+            jrrpRangeMap[jrrpPersonString.toLong()] = IntRange(rangeString.split("..")[0].toInt(), rangeString.split("..")[1].toInt())
+        }
         if ("," in groupString) {
             val groups = groupString.split(",").toMutableList()
             groups.forEach {

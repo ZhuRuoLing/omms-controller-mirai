@@ -1,7 +1,8 @@
 package net.zhuruoling.omms.controller.mirai.util
 
-import io.ktor.util.*
+import net.zhuruoling.omms.controller.mirai.controller.Status
 import net.zhuruoling.omms.controller.mirai.system.SystemInfo
+import okhttp3.internal.notify
 import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.Font
@@ -13,6 +14,7 @@ import java.io.InputStream
 import java.lang.management.ManagementFactory
 import java.nio.file.Path
 import javax.imageio.ImageIO
+import javax.rmi.CORBA.Util
 import kotlin.io.path.Path
 
 fun createImage(width: Int, height: Int): BufferedImage {
@@ -52,7 +54,7 @@ fun test(len: Int) {
     saveImage(Path(joinFilePaths("image", "${randomStringGen(8)}.png")), image)
 }
 
-fun genImage(systemInfo : SystemInfo): InputStream? {
+fun genImage(systemInfo: SystemInfo, fromJson: Map<String, Status>): InputStream? {
     println("Creating image")
     val info = systemInfo
 
@@ -61,13 +63,13 @@ fun genImage(systemInfo : SystemInfo): InputStream? {
     strings.add("Processor: ${info.processorInfo.processorName?.trimEnd()} x${info.processorInfo.physicalCPUCount}")
     val runtime = ManagementFactory.getRuntimeMXBean()
     val upTime = runtime.uptime / 1000.0
-    strings.add(String.format("Uptime: %.3fS",upTime))
+    strings.add(String.format("Uptime: %.3fS", upTime))
     val memoryMXBean = ManagementFactory.getMemoryMXBean()
     val heapMemoryUsage = memoryMXBean.heapMemoryUsage
     val nonHeapMemoryUsage = memoryMXBean.nonHeapMemoryUsage
     val maxMemory = (heapMemoryUsage.max + nonHeapMemoryUsage.max) / 1024.0 / 1024.0
     val usedMemory = (heapMemoryUsage.used + nonHeapMemoryUsage.used) / 1024.0 / 1024.0
-    strings.add(String.format("JVM Memory usage: %.3fMiB/%.3fMiB",usedMemory, maxMemory))
+    strings.add(String.format("JVM Memory usage: %.3fMiB/%.3fMiB", usedMemory, maxMemory))
     strings.add(
         "RAM: ${info.memoryInfo.memoryUsed / 1024 / 1024}MB/${info.memoryInfo.memoryTotal / 1024 / 1024}MB(${
             String.format(
@@ -91,6 +93,28 @@ fun genImage(systemInfo : SystemInfo): InputStream? {
             })"
         )
     }
+    strings.add("Controllers:")
+    fromJson.forEach {
+        val status = it.value
+        strings.add("  [${if (status.isAlive) "o" else if (!status.isQueryable) "?" else "x"}] ${it.key}: ${if (!status.isQueryable) "(Not Queryable.)" else "" }")
+        if (status.isAlive) {
+            strings.add("    Players: ${status.playerCount}/${status.maxPlayerCount} ${if (status.playerCount != 0) "->" else ""} ")
+            val players = status.players
+            if (status.playerCount % 2 == 0) {
+                //0     2     4
+                //0 1   2 3   4 5
+                for (i in 0 until (status.playerCount / 2)) {
+                    strings.add("      ${players[i]} ${players[i + 1]}")
+                }
+
+            } else {
+                for (i in 0 until (status.playerCount - 1) / 2)
+                    strings.add("      ${players[i]} ${players[i + 1]}")
+                strings.add("      ${players.last()} ")
+            }
+        }
+    }
+
     val font = Font("Consolas", Font.PLAIN, 32)
     val image = createImage(
         1080,
@@ -112,8 +136,7 @@ fun genImage(systemInfo : SystemInfo): InputStream? {
     return try {
         ImageIO.write(image, "png", stream)
         ByteArrayInputStream(stream.toByteArray())
-    }
-    catch (e:Throwable){
+    } catch (e: Throwable) {
         e.printStackTrace()
         null
     }

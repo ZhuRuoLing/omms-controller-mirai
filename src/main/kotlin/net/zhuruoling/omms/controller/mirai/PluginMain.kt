@@ -9,7 +9,10 @@ import io.ktor.client.plugins.auth.*
 import io.ktor.client.plugins.auth.providers.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescription
 import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
 import net.mamoe.mirai.contact.Contact.Companion.sendImage
@@ -18,30 +21,27 @@ import net.mamoe.mirai.event.events.BotOfflineEvent
 import net.mamoe.mirai.event.events.BotOnlineEvent
 import net.mamoe.mirai.event.events.GroupMessageEvent
 import net.mamoe.mirai.event.globalEventChannel
-import net.mamoe.mirai.message.data.Message
 import net.mamoe.mirai.message.data.content
 import net.mamoe.mirai.message.data.isContentEmpty
 import net.mamoe.mirai.utils.info
+import net.zhuruoling.omms.controller.mirai.controller.Status
 import net.zhuruoling.omms.controller.mirai.network.broadcast.Broadcast
 import net.zhuruoling.omms.controller.mirai.network.broadcast.UdpBroadcastSender
 import net.zhuruoling.omms.controller.mirai.network.broadcast.UdpReceiver
 import net.zhuruoling.omms.controller.mirai.system.SystemInfo
-import net.zhuruoling.omms.controller.mirai.util.TARGET_CHAT
-import net.zhuruoling.omms.controller.mirai.util.calculateToken
-import net.zhuruoling.omms.controller.mirai.util.genImage
-import net.zhuruoling.omms.controller.mirai.util.rpWithComment
+import net.zhuruoling.omms.controller.mirai.util.*
 import java.io.File
-import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.random.Random
 import kotlin.random.nextInt
 
+
 object PluginMain : KotlinPlugin(
     JvmPluginDescription(
         id = "net.zhuruoling.omms.controller.mirai",
         name = "omms-controller",
-        version = "0.0.1"
+        version = "0.7.1"
     ) { author("ZhuRuoLing") }) {
 
     private val udpBroadcastSender = UdpBroadcastSender()
@@ -80,6 +80,7 @@ object PluginMain : KotlinPlugin(
                         Config.groups.forEach {
                             try {
                                 val broadcast = Gson().fromJson(info, Broadcast::class.java)
+                                if (broadcast.id == oldId) return@forEach
                                 if (broadcast.player.startsWith("\ufff3\ufff4") || broadcast.server == "OMMS CENTRAL") {
                                     GlobalScope.launch(this@PluginMain.coroutineContext) {
                                         bot.getGroup(it)?.sendMessage(
@@ -150,14 +151,26 @@ object PluginMain : KotlinPlugin(
                 val response = client.get("http://${Config.httpAddress}/status") {
                     headers.append(HttpHeaders.UserAgent, "omms controller")
                 }
+                val response1 = client.get("http://${Config.httpAddress}/status/controllers") {
+                    headers.append(HttpHeaders.UserAgent, "omms controller")
+                }
                 try {
                     when (response.status) {
                         HttpStatusCode.OK -> genImage(
                             gson.fromJson(
                                 response.body<String>(),
                                 SystemInfo::class.java
+                            ),
+                            gson.fromJson(
+                                response1.body<String>(),
+                                getType(
+                                    MutableMap::class.java,
+                                    String::class.javaObjectType,
+                                    Status::class.javaObjectType
+                                )
                             )
                         )?.let { it1 -> this.group.sendImage(it1) }
+
                         HttpStatusCode.Unauthorized -> this.group.sendMessage("Failed to authenticate using name ${Config.name} with server.")
                         HttpStatusCode.NotFound -> this.group.sendMessage("Cannot fetch system info from server, that might caused by a outdated Central server.")
                         else -> this.group.sendMessage("Cannot contact with server, code: ${response.status}")
@@ -186,8 +199,15 @@ object PluginMain : KotlinPlugin(
                 if (!singleMessage.isContentEmpty()) {
                     if (singleMessage.content.startsWith(".j") || singleMessage.content.startsWith("。j")) {
                         val rp = Random(
-                            it.sender.id xor SimpleDateFormat("YYYYMMDD").format(Date()).hashCode().toLong()
-                        ).nextInt(IntRange(0, 100))
+                            (
+                                (
+                                    (it.sender.id % 233) - (114514 % SimpleDateFormat("YYYYMMDD").format(Date())
+                                        .hashCode())
+                                    ) % 1919810
+                                ) xor 1919810
+                        ).nextInt(
+                            if (Config.jrrpCheats) Config.jrrpRangeMap[it.sender.id] ?: IntRange(0, 100) else IntRange(0, 100)
+                        )
                         this.group.sendMessage(rpWithComment(rp))
                         return@subscribeAlways
                     }

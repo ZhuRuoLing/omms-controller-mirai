@@ -1,8 +1,11 @@
 package net.zhuruoling.omms.controller.mirai.util
 
+import com.google.gson.GsonBuilder
 import net.zhuruoling.omms.controller.mirai.network.Target
 import net.zhuruoling.omms.controller.mirai.network.broadcast.UdpBroadcastSender
 import java.io.File
+import java.lang.reflect.ParameterizedType
+import java.lang.reflect.Type
 import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.time.LocalDateTime
@@ -12,10 +15,14 @@ import kotlin.streams.toList
 
 val TARGET_CHAT: Target = UdpBroadcastSender.createTarget("224.114.51.4", 10086)
 val TARGET_CONTROL: Target = UdpBroadcastSender.createTarget("224.114.51.4", 10087)
+var oldId = ""
+
 
 enum class RPType {
     NICE, FUCK, NORMAL, NULL, ONE_HUNDRED
 }
+
+
 
 fun rpWithComment(rp: Int): String {
     val message = "你今日的人品是：$rp"
@@ -97,4 +104,14 @@ fun joinFilePaths(vararg pathComponent: String?): String {
         path.append(x)
     }
     return path.toString()
+}
+
+fun getType(raw: Class<*>, vararg args: Type) = object : ParameterizedType {
+    override fun getRawType(): Type = raw
+    override fun getActualTypeArguments(): Array<out Type> = args
+    override fun getOwnerType(): Type? = null
+}
+
+fun toJson(obj: Any): String{
+    return GsonBuilder().serializeNulls().create().toJson(obj)
 }
